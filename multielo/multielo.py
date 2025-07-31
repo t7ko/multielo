@@ -25,6 +25,7 @@ class MultiElo:
         score_function_base: float = DEFAULT_SCORING_FUNCTION_BASE,
         custom_score_function: Callable = None,
         log_base: int = 10,
+        progressive_elo: bool = False,
     ):
         """
         :param k_value: K parameter in Elo algorithm that determines how much ratings increase or decrease
@@ -38,11 +39,15 @@ class MultiElo:
         of monotonically decreasing values summing to 1
         :param log_base: base to use for logarithms throughout the Elo algorithm. Traditionally Elo
         uses base-10 logs
+        :param progressive_elo: base algorithm produces unexpectedly wide
+        variations for matches with small number of players, as compared to
+        matches with 10+ players.  With this parameter as True, it will progressively adjust k_value depending on number of players in a match.
         """
         self.k = k_value
         self.d = d_value
         self._score_func = custom_score_function or create_exponential_score_function(base=score_function_base)
         self._log_base = log_base
+        self.progressive_elo = progressive_elo
 
     def get_new_ratings(
             self,
@@ -75,6 +80,12 @@ class MultiElo:
         actual_scores = self.get_actual_scores(n, result_order)
         expected_scores = self.get_expected_scores(initial_ratings)
         scale_factor = self.k * (n - 1)
+        if self.progressive_elo:
+            if   n == 6: scale_factor = scale_factor / 1.5
+            elif n == 5: scale_factor = scale_factor / 2.0
+            elif n == 4: scale_factor = scale_factor / 2.5
+            elif n == 3: scale_factor = scale_factor / 3.1
+            elif n == 2: scale_factor = scale_factor / 4.0
         logger.debug(f"scale factor: {scale_factor}")
         return initial_ratings + scale_factor * (actual_scores - expected_scores)
 
